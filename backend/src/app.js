@@ -7,10 +7,9 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(cors({
-    origin: "*"
-    
+  origin: ["https://railway-omega-green.vercel.app"],
+  credentials: true,
 }));
-
 // Routes
 
 app.use(alertRouter);
