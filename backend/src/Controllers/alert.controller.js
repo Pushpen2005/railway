@@ -1,4 +1,4 @@
-import alertModel from "../Models/alert.model.js";
+import alertModel from "../models/alert.model.js";
 
 //create alert
 export async function createAlert(req, res) {
