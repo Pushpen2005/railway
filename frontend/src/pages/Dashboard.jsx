@@ -4,11 +4,9 @@ import AlertCard from '../components/AlertCard.jsx';
 import SensorStatus from '../components/SensorStatus.jsx';
 import StatCard from '../components/StatCard.jsx';
 import { getAlerts, normalizeAlert } from '../api/alerts.js';
-import { mockSensors, mockCameraFeeds, systemHealth } from '../data/mockData.js';
-
-const latestCamera = mockCameraFeeds[0];
 
 function formatTime(ts) {
+  if (!ts) return 'N/A';
   return new Date(ts).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 }
 
@@ -42,12 +40,37 @@ export default function Dashboard() {
   }, []);
 
   const latestAlert = useMemo(() => alerts.find((a) => a.detected), [alerts]);
+  const latestCamera = useMemo(() => alerts[0] || null, [alerts]);
+
+  const sensors = useMemo(() => {
+    const sensorMap = new Map();
+
+    alerts.forEach((alert) => {
+      if (sensorMap.has(alert.sensor)) return;
+      sensorMap.set(alert.sensor, {
+        id: alert.sensor,
+        location: alert.location,
+        status: alert.detected ? 'active' : 'idle',
+        batteryLevel: 100,
+        lastPing: formatTime(alert.timestamp),
+      });
+    });
+
+    return Array.from(sensorMap.values());
+  }, [alerts]);
+
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const alertsToday = alerts.filter((a) => new Date(a.timestamp) >= todayStart).length;
   const detectionAccuracy = alerts.length
     ? `${((alerts.filter((a) => a.detected).length / alerts.length) * 100).toFixed(1)}%`
-    : systemHealth.detectionAccuracy;
+    : 'N/A';
+
+  const systemHealth = {
+    uptime: 'Online',
+    apiLatency: 'Live',
+    lastUpdate: new Date(),
+  };
 
   return (
     <div className="animate-fade-in">
@@ -143,27 +166,33 @@ export default function Dashboard() {
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Verified Image</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">{latestCamera.location}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{latestCamera?.location || 'No location yet'}</p>
                 </div>
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${
-                  latestCamera.detected
+                  latestCamera?.detected
                     ? 'bg-red-50 text-red-600 border border-red-100'
                     : 'bg-green-50 text-green-600 border border-green-100'
                 }`}>
-                  {latestCamera.detected ? 'Animal' : 'No Animal'}
+                  {latestCamera?.detected ? 'Animal' : 'No Animal'}
                 </span>
               </div>
               <div className="w-full h-48 bg-gray-100">
-                <img
-                  src={latestCamera.image}
-                  alt="Latest camera feed"
-                  className="w-full h-full object-cover"
-                />
+                {latestCamera ? (
+                  <img
+                    src={latestCamera.image}
+                    alt="Latest camera feed"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-sm text-gray-400">
+                    Waiting for first detection image
+                  </div>
+                )}
               </div>
               <div className="px-5 py-3 flex items-center justify-between">
-                <span className="text-xs text-gray-400">Camera {latestCamera.id}</span>
+                <span className="text-xs text-gray-400">Camera {latestCamera?.sensor || 'N/A'}</span>
                 <span className="text-xs text-gray-400">
-                  {formatTime(latestCamera.lastUpdated)}
+                  {formatTime(latestCamera?.timestamp)}
                 </span>
               </div>
             </div>
@@ -183,13 +212,13 @@ export default function Dashboard() {
                   { label: 'System Uptime', value: systemHealth.uptime, ok: true },
                   {
                     label: 'Cameras Online',
-                    value: `${mockCameraFeeds.length}/${mockCameraFeeds.length}`,
-                    ok: true,
+                    value: `${sensors.length}/${sensors.length}`,
+                    ok: sensors.length > 0,
                   },
                   {
                     label: 'Sensors Active',
-                    value: `${mockSensors.filter(s => s.status === 'active').length}/${mockSensors.length}`,
-                    ok: true,
+                    value: `${sensors.filter(s => s.status === 'active').length}/${sensors.length || 0}`,
+                    ok: sensors.length > 0,
                   },
                 ].map((row) => (
                   <div key={row.label} className="flex items-center justify-between py-1">
@@ -207,7 +236,7 @@ export default function Dashboard() {
 
         {/* Right: Sensor Status */}
         <div className="col-span-4">
-          <SensorStatus sensors={mockSensors} />
+          <SensorStatus sensors={sensors} />
         </div>
       </div>
     </div>

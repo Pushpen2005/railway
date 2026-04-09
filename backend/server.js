@@ -13,15 +13,16 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "*"
+    origin: ["https://railway-omega-green.vercel.app"],
+    credentials: true,
   }
 });
+
+app.set('io', io);
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 });
-
-io.listen(server);
 
 server.listen(3005, () => {
   console.log('Server is running on port 3005');

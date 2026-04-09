@@ -18,6 +18,12 @@ export async function createAlert(req, res) {
             time:Date.now()
         });
         await alert.save();
+
+        const io = req.app.get('io');
+        if (io) {
+            io.emit('alert:created', alert);
+        }
+
         res.status(201).json({ message: "Alert created successfully", alert });
     } catch (error) {
         res.status(400).json({ message: "Invalid request body" });
@@ -59,6 +65,12 @@ export async function updateAlertAction(req, res) {
         alert.actionTaken = actionTaken;
         alert.status = 'resolved';
         await alert.save();
+
+        const io = req.app.get('io');
+        if (io) {
+            io.emit('alert:resolved', alert);
+        }
+
         res.status(200).json({ message: "Alert updated successfully", alert });
     } catch (error) {
         res.status(400).json({ message: "Invalid request body" });

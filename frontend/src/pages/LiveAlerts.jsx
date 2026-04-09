@@ -1,5 +1,6 @@
 // src/pages/LiveAlerts.jsx
 import React, { useEffect, useMemo, useState } from 'react';
+import { io } from 'socket.io-client';
 import { getActiveAlerts, normalizeAlert, updateAlertAction } from '../api/alerts.js';
 
 function formatTs(ts) {
@@ -14,12 +15,25 @@ export default function LiveAlerts() {
   const [expanded, setExpanded] = useState(null);
   const [filter, setFilter] = useState('all');
   const [alerts, setAlerts] = useState([]);
+  const [resolvingId, setResolvingId] = useState('');
+  const [toasts, setToasts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [resolvingId, setResolvingId] = useState(null);
+
+  const addToast = (message, type = 'info') => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 3500);
+  };
 
   useEffect(() => {
     let isMounted = true;
+    const socket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:3005', {
+      transports: ['websocket'],
+      withCredentials: true,
+    });
 
     async function fetchLiveAlerts() {
       try {
@@ -37,30 +51,49 @@ export default function LiveAlerts() {
     }
 
     fetchLiveAlerts();
+
+    socket.on('alert:created', (payload) => {
+      if (!isMounted) return;
+      const incoming = normalizeAlert(payload);
+      setAlerts((prev) => {
+        const exists = prev.some((a) => a.id === incoming.id);
+        if (exists || !incoming.detected) return prev;
+        return [incoming, ...prev];
+      });
+      addToast(`Detection happened at ${incoming.location}`, 'detection');
+    });
+
+    socket.on('alert:resolved', (payload) => {
+      if (!isMounted) return;
+      const resolved = normalizeAlert(payload);
+      setAlerts((prev) => prev.filter((a) => a.id !== resolved.id));
+      setExpanded((prev) => (prev === resolved.id ? null : prev));
+      addToast(`Alert resolved for ${resolved.location}`, 'resolved');
+    });
+
     return () => {
       isMounted = false;
+      socket.disconnect();
     };
   }, []);
 
-  const filtered = useMemo(() => {
-    if (filter === 'all') return alerts;
-    if (filter === 'detected') return alerts.filter(a => a.detected);
-    return alerts.filter(a => !a.detected);
-  }, [alerts, filter]);
-
-  async function handleResolveAlert(id, actionTaken) {
+  async function handleResolve(alertId) {
     try {
-      setResolvingId(id);
-      setError('');
-      await updateAlertAction(id, actionTaken);
-      setAlerts((prev) => prev.filter((alert) => alert.id !== id));
-      setExpanded((prev) => (prev === id ? null : prev));
+      setResolvingId(alertId);
+      await updateAlertAction(alertId, 'Resolved by operator');
+      setAlerts((prev) => prev.filter((a) => a.id !== alertId));
+      setExpanded((prev) => (prev === alertId ? null : prev));
     } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to resolve alert');
+      addToast(err?.response?.data?.message || 'Failed to resolve alert', 'error');
     } finally {
-      setResolvingId(null);
+      setResolvingId('');
     }
   }
+
+  const filtered = useMemo(() => {
+    if (filter === 'all') return alerts;
+    return alerts.filter((a) => a.confidence >= 0.8);
+  }, [alerts, filter]);
 
   return (
     <div className="animate-fade-in">
@@ -74,8 +107,7 @@ export default function LiveAlerts() {
         <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
           {[
             { key: 'all', label: 'All Events' },
-            { key: 'detected', label: 'Detections' },
-            { key: 'clear', label: 'Clear' },
+            { key: 'critical', label: 'Critical (>=80%)' },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -135,7 +167,7 @@ export default function LiveAlerts() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-gray-900">
-                      {alert.detected ? 'Animal Detected' : 'Track Clear'}
+                        {alert.detected ? `${alert.animal} Detected` : 'Track Clear'}
                     </p>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-md border ${
                       alert.detected
@@ -201,41 +233,46 @@ export default function LiveAlerts() {
                       <p className="text-xs text-gray-400 mb-1">Location</p>
                       <p className="text-sm font-medium text-gray-700">{alert.location}</p>
                     </div>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-gray-200 flex items-center gap-2">
                     <button
-                      type="button"
-                      onClick={() => handleResolveAlert(alert.id, 'Signal Triggered')}
+                      id={`resolve-alert-${alert.id}`}
+                      onClick={() => handleResolve(alert.id)}
                       disabled={resolvingId === alert.id}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="h-fit px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white text-xs font-semibold rounded-lg transition-colors"
                     >
-                      Signal Triggered
+                      {resolvingId === alert.id ? 'Resolving...' : 'Resolve'}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleResolveAlert(alert.id, 'Alert Sent')}
-                      disabled={resolvingId === alert.id}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      Alert Sent
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleResolveAlert(alert.id, 'Emergency Stop')}
-                      disabled={resolvingId === alert.id}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      Emergency Stop
-                    </button>
-                    {resolvingId === alert.id && (
-                      <span className="text-xs text-gray-500">Resolving...</span>
-                    )}
                   </div>
                 </div>
               )}
             </div>
           );
         })}
+
+        {!loading && !error && filtered.length === 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-4 text-sm text-gray-500">
+            No active detections right now.
+          </div>
+        )}
+      </div>
+
+      {/* Popup notifications */}
+      <div className="fixed top-20 right-6 z-50 space-y-2 w-80">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`rounded-xl border px-4 py-3 shadow-md text-sm animate-fade-in ${
+              toast.type === 'detection'
+                ? 'bg-red-50 border-red-200 text-red-700'
+                : toast.type === 'resolved'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : toast.type === 'error'
+                ? 'bg-amber-50 border-amber-200 text-amber-700'
+                : 'bg-white border-gray-200 text-gray-700'
+            }`}
+          >
+            {toast.message}
+          </div>
+        ))}
       </div>
     </div>
   );

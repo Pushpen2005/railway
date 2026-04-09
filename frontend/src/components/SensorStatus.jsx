@@ -20,6 +20,8 @@ function BatteryBar({ level }) {
 }
 
 export default function SensorStatus({ sensors }) {
+  const activeCount = sensors.filter(s => s.status === 'active').length;
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
       <div className="flex items-center justify-between mb-5">
@@ -28,9 +30,15 @@ export default function SensorStatus({ sensors }) {
           <p className="text-xs text-gray-400 mt-0.5">Live sensor telemetry</p>
         </div>
         <span className="text-xs font-medium text-gray-400 bg-gray-50 border border-gray-100 px-2.5 py-1 rounded-lg">
-          {sensors.filter(s => s.status === 'active').length}/{sensors.length} Online
+          {activeCount}/{sensors.length} Online
         </span>
       </div>
+
+      {sensors.length === 0 && (
+        <div className="text-sm text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
+          No sensor telemetry available yet.
+        </div>
+      )}
 
       <div className="divide-y divide-gray-50">
         {sensors.map((sensor) => {

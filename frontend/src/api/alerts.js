@@ -18,13 +18,15 @@ API.interceptors.request.use((config) => {
 export function normalizeAlert(alert) {
   return {
     id: alert._id || alert.id,
+    animal: alert.animal || "Unknown",
     detected: alert.status === "active",
+    status: alert.status || "active",
     timestamp: alert.time || alert.timestamp,
     image: alert.imageUrl || "https://via.placeholder.com/240x160?text=No+Image",
     confidence: Number(alert.confidence) || 0,
     sensor: alert.sensorId || "N/A",
     location: alert.location || "Unknown",
-    action: alert.actionTaken || (alert.status === "active" ? "Pending" : "Cleared"),
+    action: alert.actionTaken || (alert.status === "active" ? "Pending Resolution" : "Resolved"),
   };
 }
 

@@ -62,8 +62,7 @@ export default function Sidebar({ activePage, onNavigate }) {
           </svg>
         </div>
         <div>
-          <p className="font-700 text-gray-900 text-sm font-bold leading-tight tracking-tight">RailGuard AI</p>
-          <p className="text-xs text-gray-400 font-medium">Detection System</p>
+          <p className="font-700 text-gray-900 text-sm font-bold leading-tight tracking-tight">Airavaat</p>
         </div>
       </div>
 

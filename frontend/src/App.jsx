@@ -60,41 +60,6 @@ export default function App() {
           </div>
         </main>
       </div>
-
-      {/* Live update ticker – simulates real-time */}
-      <LiveUpdateTicker />
-    </div>
-  );
-}
-
-// Small floating ticker at bottom-right
-function LiveUpdateTicker() {
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 4000);
-    return () => clearInterval(id);
-  }, []);
-
-  const messages = [
-    'All sensors reporting normally',
-    'PIR-01 heartbeat received',
-    'CAM-01 frame captured',
-    'PIR-02 heartbeat received',
-    'System health check: OK',
-    'CAM-02 frame captured',
-    'Model inference: 28ms',
-    'PIR-03 heartbeat received',
-  ];
-
-  return (
-    <div className="fixed bottom-6 right-6 flex items-center gap-2.5 bg-white border border-gray-100 rounded-2xl px-4 py-2.5 shadow-sm z-10">
-      <span className="relative flex h-2 w-2">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-      </span>
-      <p className="text-xs font-medium text-gray-500 animate-fade-in" key={tick}>
-        {messages[tick % messages.length]}
-      </p>
     </div>
   );
 }
